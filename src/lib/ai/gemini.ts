@@ -378,11 +378,11 @@ export async function startVideoGeneration(
 
     // Check if it completed immediately (unlikely for video)
     if (operation?.done) {
-      const uri = extractVideoUri(operation);
+      const videoInfo = extractVideoInfo(operation);
       return {
         operationName: opName,
         done: true,
-        videoUri: uri,
+        videoUri: videoInfo?.uri,
         mimeType: 'video/mp4',
       };
     }

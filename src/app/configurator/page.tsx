@@ -347,7 +347,7 @@ export default function ConfiguratorPage() {
               ].map((p) => (
                 <button
                   key={p.label}
-                  onClick={() => setValues((prev) => ({ ...prev, ...p.preset }))}
+                  onClick={() => setValues((prev) => ({ ...prev, ...(p.preset as Record<string, number>) }))}
                   className="py-2 text-[9px] font-semibold tracking-[0.08em] uppercase rounded-lg border border-white/[0.08] text-white/40 hover:text-[#C59B4A] hover:border-[#C59B4A]/30 transition-all hover:bg-[#C59B4A]/[0.05]"
                 >
                   <span className="block text-sm mb-0.5 opacity-40">{p.icon}</span>
