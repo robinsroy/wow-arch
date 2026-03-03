@@ -36,14 +36,13 @@ export async function POST(req: NextRequest) {
 
     const userPrompt = prompt || 'Generate a photorealistic architectural visualization based on the uploaded reference image';
 
-    // ── Step 1: Analyse uploaded image (if any) ──
-    let imageAnalysis: string | undefined;
-    if (imageBase64 && imageMimeType) {
-      imageAnalysis = await analyzeImage(imageBase64, imageMimeType);
-    }
-
-    // ── Step 2: BaoBao AI review ──
-    const aiReview = await reviewPrompt(userPrompt, imageBase64, imageMimeType);
+    // ── Steps 1 & 2: Analyse image + AI review in parallel ──
+    const [imageAnalysis, aiReview] = await Promise.all([
+      imageBase64 && imageMimeType
+        ? analyzeImage(imageBase64, imageMimeType)
+        : Promise.resolve(undefined),
+      reviewPrompt(userPrompt, imageBase64, imageMimeType),
+    ]);
 
     // ── Step 3: Enhance prompt for Imagen ──
     const enhancedPrompt = await enhancePromptForImage(
