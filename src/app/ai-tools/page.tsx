@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import TextReveal from '@/components/animations/TextReveal';
 import ScrollReveal from '@/components/animations/ScrollReveal';
-import { useAIGeneration, type OutputMode } from '@/hooks/useAIGeneration';
+import { useAIGeneration, type OutputMode, type GenerationResult } from '@/hooks/useAIGeneration';
 
 /* ─────────────────────────────────────────────
    Static Data
