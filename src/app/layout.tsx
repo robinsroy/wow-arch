@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
 import { Playfair_Display, Inter } from 'next/font/google';
 import './globals.css';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+import LayoutShell from '@/components/layout/LayoutShell';
 import SmoothScrollProvider from '@/providers/SmoothScrollProvider';
 import PageTransitionProvider from '@/providers/PageTransitionProvider';
 
@@ -44,11 +43,11 @@ export default function RootLayout({
     <html lang="en" className={`${playfair.variable} ${inter.variable}`}>
       <body className="antialiased">
         <SmoothScrollProvider>
-          <Header />
-          <PageTransitionProvider>
-            <main>{children}</main>
-          </PageTransitionProvider>
-          <Footer />
+          <LayoutShell>
+            <PageTransitionProvider>
+              <main>{children}</main>
+            </PageTransitionProvider>
+          </LayoutShell>
         </SmoothScrollProvider>
       </body>
     </html>

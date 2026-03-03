@@ -2,6 +2,7 @@ export const NAV_LINKS = [
   { label: 'Practice', href: '/about' },
   { label: 'Projects', href: '/projects' },
   { label: 'AI Studio', href: '/ai-tools' },
+  { label: 'Configurator', href: '/configurator' },
   { label: 'Contact', href: '#contact' },
 ] as const;
 

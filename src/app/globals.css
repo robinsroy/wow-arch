@@ -199,6 +199,33 @@ html.lenis, html.lenis body {
 }
 
 /* ═══════════════════════════════════════════
+   No-Scrollbar Utility
+   ═══════════════════════════════════════════ */
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Thin scrollbar for dark panels */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 3px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 9999px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.15);
+}
+
+/* ═══════════════════════════════════════════
    Tailwind v4 Theme Tokens
    ═══════════════════════════════════════════ */
 
