@@ -5,8 +5,8 @@
 export const AI_CONFIG = {
   /** Model identifiers */
   models: {
-    /** Gemini 2.0 Flash — chat, review, prompt enhancement (fast & cheap) */
-    chat: 'gemini-2.0-flash',
+    /** Gemini 3.8 Flash — chat, review, prompt enhancement (fast & cheap) */
+    chat: 'gemini-3.8-flash',
     /**
      * Nano Banana Pro  (Gemini 3 Pro Image Preview)
      * State-of-the-art image generation via generateContent.
