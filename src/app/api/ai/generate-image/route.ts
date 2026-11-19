@@ -6,7 +6,9 @@ import {
   generateImages,
 } from '@/lib/ai/gemini';
 
-export const maxDuration = 60;
+// 4 sequential Nano Banana Pro calls plus review/enhancement take ~90s,
+// so allow well beyond that.
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   try {

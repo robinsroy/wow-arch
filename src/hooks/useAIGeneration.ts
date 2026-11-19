@@ -10,7 +10,6 @@ export type GenerationPhase =
   | 'idle'
   | 'reviewing'
   | 'generating'
-  | 'polling'
   | 'complete'
   | 'error';
 
@@ -79,7 +78,7 @@ export function useAIGeneration() {
         params.mode === 'image'
           ? 'Generating photorealistic renders…'
           : params.mode === 'video'
-            ? 'Starting cinematic walkthrough…'
+            ? 'Rendering cinematic walkthrough… this may take a minute'
             : 'Crafting your presentation…',
       );
 
@@ -103,28 +102,8 @@ export function useAIGeneration() {
         throw new Error(errorBody.error || `Generation failed (${res.status})`);
       }
 
-      const data: GenerationResult & { operationName?: string; done?: boolean } =
-        await res.json();
-
-      // ── Video polling ──
-      if (params.mode === 'video' && data.operationName && !data.done) {
-        setPhase('polling');
-        setProgress('Rendering video frames… this may take a minute');
-
-        const videoResult = await pollVideoStatus(
-          data.operationName,
-          controller.signal,
-        );
-
-        setResult({
-          aiReview: data.aiReview,
-          enhancedPrompt: data.enhancedPrompt,
-          videoData: videoResult.videoData || videoResult.videoUri,
-          videoMimeType: videoResult.mimeType || 'video/mp4',
-        });
-      } else {
-        setResult(data);
-      }
+      const data: GenerationResult = await res.json();
+      setResult(data);
 
       setPhase('complete');
       setProgress('');
@@ -135,36 +114,6 @@ export function useAIGeneration() {
       setProgress('');
     }
   }, []);
-
-  /* ── Video polling ── */
-  const pollVideoStatus = async (
-    operationName: string,
-    signal: AbortSignal,
-  ): Promise<{ done: boolean; videoData?: string; videoUri?: string; mimeType?: string }> => {
-    const MAX_POLLS = 60;
-    const INTERVAL = 10_000;
-
-    for (let i = 0; i < MAX_POLLS; i++) {
-      if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
-
-      await new Promise((r) => setTimeout(r, INTERVAL));
-
-      const res = await fetch(
-        `/api/ai/video-status?operation=${encodeURIComponent(operationName)}`,
-        { signal },
-      );
-      const data = await res.json();
-
-      if (data.error) throw new Error(data.error);
-      if (data.done) return data;
-
-      setProgress(
-        data.progress || `Rendering video… ${Math.round(((i + 1) / MAX_POLLS) * 100)}%`,
-      );
-    }
-
-    throw new Error('Video generation timed out after 10 minutes');
-  };
 
   /* ── Reset / Cancel ── */
   const reset = useCallback(() => {
@@ -182,6 +131,6 @@ export function useAIGeneration() {
     progress,
     generate,
     reset,
-    isGenerating: phase === 'reviewing' || phase === 'generating' || phase === 'polling',
+    isGenerating: phase === 'reviewing' || phase === 'generating',
   };
 }

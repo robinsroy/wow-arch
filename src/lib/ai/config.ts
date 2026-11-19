@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════
-   AI Service Configuration  —  March 2026
+   AI Service Configuration  —  November 2026
    ═══════════════════════════════════════════ */
 
 export const AI_CONFIG = {
@@ -8,17 +8,20 @@ export const AI_CONFIG = {
     /** Gemini 3.8 Flash — chat, review, prompt enhancement (fast & cheap) */
     chat: 'gemini-3.8-flash',
     /**
-     * Nano Banana Pro  (Gemini 3 Pro Image Preview)
+     * Nano Banana Pro  (Gemini 3 Pro Image, stable)
      * State-of-the-art image generation via generateContent.
      * Inputs: Text + Images  |  Outputs: Text + Images
      * Max input images: 14  |  Max output: 32 768 tokens
      */
-    image: 'gemini-3-pro-image-preview',
+    image: 'gemini-3-pro-image',
     /**
-     * Veo 3.1 — video generation via SDK generateVideos.
-     * 8s 720p/1080p/4K, native audio, portrait & landscape.
+     * Gemini Omni 1.2 Flash — video generation via the Interactions API.
+     * 3–15s, 360p/720p (1080p/4K upscaled), 16:9 or 9:16.
+     * Replaces Veo 3.1, which was shut down on 22 Oct 2026.
      */
-    video: 'veo-3.1-generate-preview',
+    video: 'gemini-omni-1.2-flash',
+    /** Image model Gamma uses for AI-generated slide images (Nano Banana Pro) */
+    gammaImage: 'gemini-3-pro-image',
   },
 
   /** Generation defaults */
@@ -27,8 +30,8 @@ export const AI_CONFIG = {
     maxImages: 4,
     defaultAspectRatio: '16:9' as const,
     videoDurationSeconds: 8,
-    videoPollIntervalMs: 10_000,
-    maxVideoPolls: 60, // ~10 min ceiling
+    /** 720p keeps the video under the 4 MB inline-response limit */
+    videoResolution: '720p' as const,
   },
 
   /** Gemini 3 Pro Image constraints */

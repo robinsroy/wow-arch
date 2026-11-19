@@ -1,11 +1,11 @@
 /* ═══════════════════════════════════════════
-   BaoBao AI — Service Layer  (March 2026)
+   BaoBao AI — Service Layer  (November 2026)
    ═══════════════════════════════════════════
    Uses:
-     • Gemini 2.0 Flash  — chat, review, prompt enhancement
-     • Nano Banana Pro (gemini-3-pro-image-preview)
+     • Gemini 3.8 Flash  — chat, review, prompt enhancement
+     • Nano Banana Pro (gemini-3-pro-image)
        — state-of-the-art image gen via generateContent
-     • Veo 3.1 — video generation via SDK generateVideos
+     • Gemini Omni 1.2 Flash — video generation via the Interactions API
 
    Server-only — never import from client components.
 */
@@ -39,7 +39,7 @@ function getApiKey(): string {
 }
 
 /* ═══════════════════════════════════════════
-   Chat / Review  (Gemini 2.0 Flash)
+   Chat / Review  (Gemini 3.8 Flash)
    ═══════════════════════════════════════════ */
 
 /**
@@ -97,7 +97,7 @@ export async function reviewPrompt(
 }
 
 /* ═══════════════════════════════════════════
-   Image Analysis  (Gemini 2.0 Flash)
+   Image Analysis  (Gemini 3.8 Flash)
    ═══════════════════════════════════════════ */
 
 /**
@@ -130,7 +130,7 @@ export async function analyzeImage(
 }
 
 /* ═══════════════════════════════════════════
-   Prompt Enhancement  (Gemini 2.0 Flash)
+   Prompt Enhancement  (Gemini 3.8 Flash)
    ═══════════════════════════════════════════ */
 
 export async function enhancePromptForImage(
@@ -180,7 +180,7 @@ export async function enhancePromptForVideo(
 /* ═══════════════════════════════════════════
    Image Generation  —  Nano Banana Pro
    ═══════════════════════════════════════════
-   Uses gemini-3-pro-image-preview (Nano Banana Pro) via
+   Uses gemini-3-pro-image (Nano Banana Pro) via
    generateContent endpoint with responseModalities: IMAGE.
 
    Model limits (per the March 2026 docs):
@@ -271,7 +271,7 @@ export async function generateImages(
   if (images.length === 0) {
     throw new Error(
       'Image generation failed — Gemini 3 Pro Image returned no images. ' +
-      'Please check your API key has access to gemini-3-pro-image-preview.',
+      `Please check your API key has access to ${AI_CONFIG.models.image}.`,
     );
   }
 
@@ -315,271 +315,105 @@ function extractImagesFromResponse(result: GenerateContentResponse): GeneratedIm
 }
 
 /* ═══════════════════════════════════════════
-   Video Generation — Veo 3.1  (SDK generateVideos)
+   Video Generation — Gemini Omni 1.2 Flash
    ═══════════════════════════════════════════
-   Uses the @google/genai SDK methods:
-     • ai.models.generateVideos()  — starts generation
-     • ai.operations.get()         — polls operation
-     • ai.files.download()         — downloads result
+   Uses the Interactions API over REST:
+     POST /v1beta/interactions — generates the video synchronously
+     and returns it inline as base64.
 
-   Veo 3.1 features: 720p/1080p/4K, 4-8s, native audio,
-   portrait (9:16) & landscape (16:9), reference images,
-   first/last frame control, video extension.
+   The docs recommend synchronous, unstored calls for Omni, so there
+   is no operation to poll. REST is used instead of the SDK because
+   the installed @google/genai (1.43) predates the `steps` response
+   shape that Omni returns.
+
+   Omni features: 3–15s, 16:9 or 9:16, native audio, image-to-video,
+   first/last frame control, reference images, editing & extension.
 */
 
-export interface VideoOperationResult {
-  operationName: string;
-  done: boolean;
-  videoUri?: string;
-  videoData?: string;
-  mimeType?: string;
+export interface GeneratedVideo {
+  data: string; // base64
+  mimeType: string;
 }
 
 /**
- * Start a Veo 3.1 video generation via the SDK.
- * Returns an operation name for polling.
+ * Generate an architectural walkthrough video with Gemini Omni Flash.
+ * Blocks until the video is ready and returns it as base64.
+ * An optional reference image is used as the opening frame.
  */
-export async function startVideoGeneration(
+export async function generateVideo(
   prompt: string,
   imageBase64?: string,
   imageMimeType?: string,
-): Promise<VideoOperationResult> {
-  const ai = getClient();
+): Promise<GeneratedVideo> {
+  const input =
+    imageBase64 && imageMimeType
+      ? [
+          { type: 'image', data: imageBase64, mime_type: imageMimeType },
+          { type: 'text', text: prompt },
+        ]
+      : prompt;
 
-  // Build the config — durationSeconds MUST be a number (not a string)
-  const config: any = {
-    aspectRatio: AI_CONFIG.generation.defaultAspectRatio,
-    durationSeconds: AI_CONFIG.generation.videoDurationSeconds,
-    personGeneration: 'allow_all',
-  };
-
-  // Build params
-  const params: any = {
-    model: AI_CONFIG.models.video,
-    prompt,
-    config,
-  };
-
-  // If a reference image is provided, use it as the starting frame
-  // Veo 3.1 SDK expects: image: { imageBytes: base64, mimeType }
-  if (imageBase64 && imageMimeType) {
-    params.image = {
-      imageBytes: imageBase64,
-      mimeType: imageMimeType,
-    };
-    // Image-to-video requires allow_adult for person generation
-    config.personGeneration = 'allow_adult';
-  }
-
-  try {
-    const operation = await (ai.models as any).generateVideos(params);
-
-    const opName = operation?.name ?? operation?.operationName ?? '';
-
-    // Check if it completed immediately (unlikely for video)
-    if (operation?.done) {
-      const videoInfo = extractVideoInfo(operation);
-      return {
-        operationName: opName,
-        done: true,
-        videoUri: videoInfo?.uri,
-        mimeType: 'video/mp4',
-      };
-    }
-
-    return {
-      operationName: opName,
-      done: false,
-      mimeType: 'video/mp4',
-    };
-  } catch (error: any) {
-    // If Veo returns a specific error about config, provide actionable message
-    const msg = error?.message || String(error);
-    if (msg.includes('durationSeconds') || msg.includes('INVALID_ARGUMENT')) {
-      throw new Error(
-        `Veo 3.1 config error: ${msg}. Check that durationSeconds is a number (4, 6, or 8) and aspectRatio is "16:9" or "9:16".`,
-      );
-    }
-    throw error;
-  }
-}
-
-/**
- * Poll a Veo 3.1 long-running operation via REST API.
- *
- * We use a direct REST call instead of the SDK's operations.get()
- * because the SDK expects a typed operation object with internal
- * methods like _fromAPIResponse — which we can't construct from
- * just a serialised operation name.
- *
- * When the operation is done, we attempt to download the actual
- * video file and return it as base64 (since the raw URI from
- * Veo is an internal Google file reference, not a public URL).
- */
-export async function pollVideoOperation(
-  operationName: string,
-): Promise<{ done: boolean; videoUri?: string; videoData?: string; mimeType?: string; progress?: string }> {
-  const apiKey = getApiKey();
-  const url = `${AI_CONFIG.api.gemini}/${operationName}?key=${apiKey}`;
-
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
+  const res = await fetch(`${AI_CONFIG.api.gemini}/interactions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': getApiKey(),
+    },
+    body: JSON.stringify({
+      model: AI_CONFIG.models.video,
+      input,
+      store: false,
+      response_format: {
+        type: 'video',
+        aspect_ratio: AI_CONFIG.generation.defaultAspectRatio,
+        resolution: AI_CONFIG.generation.videoResolution,
+        duration: `${AI_CONFIG.generation.videoDurationSeconds}s`,
+      },
+    }),
   });
 
   if (!res.ok) {
-    const body = await res.text();
+    const body = await res.text().catch(() => '');
+    throw new Error(`Video generation failed (${res.status}): ${body.slice(0, 500)}`);
+  }
+
+  const interaction: InteractionResponse = await res.json();
+  const video = extractVideoFromInteraction(interaction);
+
+  if (!video) {
     throw new Error(
-      `Failed to poll video operation "${operationName}": ${res.status} ${body}`,
+      `Video generation returned no video (status: ${interaction.status ?? 'unknown'}). ` +
+      'The prompt or reference image may have been blocked by safety filters.',
     );
   }
 
-  const operation = await res.json();
+  return video;
+}
 
-  // Log the operation status for debugging
-  console.log(
-    `[BaoBao AI] Video poll: done=${operation?.done}, keys=${Object.keys(operation || {}).join(',')}`,
-    operation?.metadata ? `metadata=${JSON.stringify(operation.metadata)}` : '',
-  );
-
-  if (operation?.done) {
-    // Log the full response structure for debugging
-    console.log(
-      '[BaoBao AI] Video operation completed! Response structure:',
-      JSON.stringify(operation?.response ?? operation?.result ?? {}, null, 2).slice(0, 500),
-    );
-
-    // Try to extract and download the video
-    const videoInfo = extractVideoInfo(operation);
-
-    if (videoInfo?.downloadUri) {
-      // Download the video file using the Gemini Files API
-      try {
-        const videoBase64 = await downloadVideoFile(videoInfo.downloadUri, apiKey);
-        return {
-          done: true,
-          videoData: videoBase64,
-          mimeType: 'video/mp4',
-        };
-      } catch (dlErr: any) {
-        console.error('[BaoBao AI] Video download failed:', dlErr.message);
-        // Fall back to URI
-        return {
-          done: true,
-          videoUri: videoInfo.uri,
-          mimeType: 'video/mp4',
-        };
-      }
-    }
-
-    return {
-      done: true,
-      videoUri: videoInfo?.uri,
-      mimeType: 'video/mp4',
-    };
-  }
-
-  // Extract progress info
-  const progressPercent = operation?.metadata?.progressPercent;
-  const state = operation?.metadata?.state;
-
-  return {
-    done: false,
-    progress: progressPercent
-      ? `${progressPercent}% complete`
-      : state
-        ? `Status: ${state}`
-        : 'Rendering…',
-  };
+/** The parts of the Interactions API REST response we read. */
+interface InteractionResponse {
+  status?: string;
+  steps?: {
+    type?: string;
+    content?: { type?: string; data?: string; mime_type?: string }[];
+  }[];
 }
 
 /**
- * Extract video file info from a completed Veo operation response.
- * Handles both SDK format and REST API format.
+ * Pull the base64 video out of an Interactions API response.
+ * REST shape: steps[type=model_output].content[type=video].data
  */
-function extractVideoInfo(
-  operation: any,
-): { uri?: string; downloadUri?: string } | undefined {
-  let uri: string | undefined;
+function extractVideoFromInteraction(interaction: InteractionResponse): GeneratedVideo | undefined {
+  const outputs = (interaction.steps ?? [])
+    .filter((step) => step.type === 'model_output')
+    .flatMap((step) => step.content ?? []);
 
-  // ── Path 1: REST API format ──
-  // response.generateVideoResponse.generatedSamples[0].video.uri
-  const generatedSamples =
-    operation?.response?.generateVideoResponse?.generatedSamples ??
-    operation?.result?.generateVideoResponse?.generatedSamples ??
-    [];
-
-  if (generatedSamples.length > 0) {
-    const video = generatedSamples[0]?.video;
-    uri = video?.uri ?? video?.url;
-  }
-
-  // ── Path 2: SDK format ──
-  // response.generatedVideos[0].video.uri
-  if (!uri) {
-    const generatedVideos =
-      operation?.response?.generatedVideos ??
-      operation?.result?.generatedVideos ??
-      [];
-
-    if (generatedVideos.length > 0) {
-      const video = generatedVideos[0]?.video;
-      uri = video?.uri ?? video?.url;
-    }
-  }
-
-  if (uri) {
-    // If the URI already includes ?alt=media or :download, it's a direct download URL
-    if (uri.includes(':download') || uri.includes('alt=media')) {
-      return { uri, downloadUri: uri };
-    }
-
-    // Otherwise construct a download URI from the files endpoint
-    let downloadUri: string | undefined;
-    if (uri.includes('/files/')) {
-      const match = uri.match(/(\/v1(?:beta)?\/files\/[^?#]+)/);
-      if (match) {
-        downloadUri = `https://generativelanguage.googleapis.com/download${match[1]}?alt=media`;
-      }
-    }
-
-    return { uri, downloadUri: downloadUri || uri };
-  }
-
-  // ── Path 3: raw base64 predictions ──
-  const b64 = operation?.response?.predictions?.[0]?.bytesBase64Encoded;
-  if (b64) {
-    return { uri: `data:video/mp4;base64,${b64}` };
-  }
-
-  console.warn('[BaoBao AI] Could not extract video from response:', JSON.stringify(operation?.response ?? {}).slice(0, 300));
-  return undefined;
-}
-
-/**
- * Download a video file from the Gemini Files API and return base64-encoded data.
- */
-async function downloadVideoFile(downloadUrl: string, apiKey: string): Promise<string> {
-  const separator = downloadUrl.includes('?') ? '&' : '?';
-  const url = `${downloadUrl}${separator}key=${apiKey}`;
-
-  console.log('[BaoBao AI] Downloading video from:', downloadUrl.split('?')[0]);
-
-  const res = await fetch(url);
-
-  if (!res.ok) {
-    const errorText = await res.text().catch(() => '');
-    throw new Error(`Video download failed (${res.status}): ${errorText.slice(0, 200)}`);
-  }
-
-  const buffer = await res.arrayBuffer();
-  const base64 = Buffer.from(buffer).toString('base64');
-  console.log(`[BaoBao AI] Video downloaded: ${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB`);
-  return base64;
+  const video = outputs.find((item) => item.type === 'video' && item.data);
+  return video?.data ? { data: video.data, mimeType: video.mime_type ?? 'video/mp4' } : undefined;
 }
 
 /* ═══════════════════════════════════════════
-   Presentation Outline  (Gemini 2.0 Flash)
+   Presentation Outline  (Gemini 3.8 Flash)
    ═══════════════════════════════════════════ */
 
 export interface PresentationSlide {
@@ -703,7 +537,7 @@ export async function sendToGamma(
           prompt: inputText,
           exportAs,
           imageOptions: {
-            model: 'imagen-4-pro',
+            model: AI_CONFIG.models.gammaImage,
             style: 'photorealistic architectural visualization',
           },
         }),
@@ -731,7 +565,7 @@ export async function sendToGamma(
           numCards: outline.slides.length || 10,
           exportAs,
           imageOptions: {
-            model: 'imagen-4-pro',
+            model: AI_CONFIG.models.gammaImage,
             style: 'photorealistic architectural visualization',
           },
         }),

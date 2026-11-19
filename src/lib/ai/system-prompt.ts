@@ -53,7 +53,7 @@ Rules:
 - Prioritise photorealism, cinematic quality, and architectural accuracy.`;
 
 /**
- * Instruction for enhancing a video generation prompt (Veo 2).
+ * Instruction for enhancing a video generation prompt (Gemini Omni Flash).
  */
 export const VIDEO_ENHANCEMENT_PROMPT = `You are BaoBao AI. Transform the user's request into a cinematic architectural walkthrough prompt optimised for an AI video generator.
 

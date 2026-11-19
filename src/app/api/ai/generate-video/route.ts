@@ -3,10 +3,12 @@ import {
   reviewPrompt,
   analyzeImage,
   enhancePromptForVideo,
-  startVideoGeneration,
+  generateVideo,
 } from '@/lib/ai/gemini';
 
-export const maxDuration = 60;
+// Gemini Omni generates the video synchronously within this request,
+// so allow enough time for analysis + review + rendering.
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,34 +38,17 @@ export async function POST(req: NextRequest) {
       reviewPrompt(userPrompt, imageBase64, imageMimeType),
     ]);
 
-    // ── Step 3: Enhance prompt for Veo ──
+    // ── Step 3: Enhance prompt for video ──
     const enhancedPrompt = await enhancePromptForVideo(userPrompt, style, imageAnalysis);
 
-    // ── Step 4: Start Veo 3.1 generation ──
-    const operation = await startVideoGeneration(
-      enhancedPrompt,
-      imageBase64,
-      imageMimeType,
-    );
+    // ── Step 4: Generate the video (Gemini Omni Flash) ──
+    const video = await generateVideo(enhancedPrompt, imageBase64, imageMimeType);
 
-    // If the operation completed immediately (unlikely but possible)
-    if (operation.done && (operation.videoUri || operation.videoData)) {
-      return NextResponse.json({
-        aiReview,
-        enhancedPrompt,
-        done: true,
-        videoUri: operation.videoUri,
-        videoData: operation.videoData,
-        mimeType: operation.mimeType,
-      });
-    }
-
-    // Return operation name for polling
     return NextResponse.json({
       aiReview,
       enhancedPrompt,
-      done: false,
-      operationName: operation.operationName,
+      videoData: video.data,
+      videoMimeType: video.mimeType,
     });
   } catch (error: any) {
     console.error('[BaoBao AI] Video generation error:', error);
